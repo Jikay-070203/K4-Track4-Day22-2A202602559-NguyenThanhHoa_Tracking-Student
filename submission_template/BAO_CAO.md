@@ -8,6 +8,7 @@ Detector cố định: `yolo26n.pt`, ảnh 640 px, Re-ID `osnet_x0_25_msmt17`. K
 - `video_1` (có nhãn): 5 tracker × `conf` {0.1, 0.2, 0.3} ở `iou` 0.5, đủ 600 frame, rồi quét `iou` {0.4, 0.7} quanh tracker tốt nhất; chấm HOTA / MOTA / IDF1 bằng TrackEval. Bảng 17 cấu hình: `bang_quet/sweep_video_1.md`. Cấu hình nộp của `video_1` lấy từ bảng này.
 - `video_2`–`video_5` (không nhãn): 5 tracker × `conf` {0.15, 0.3}, `iou` 0.5, 150 frame đầu. Không có số HOTA, nên so sánh bằng ba số đếm từ file kết quả: **hộp/frame** (độ phủ), **số ID**, **độ dài track trung bình** (ít ID, track dài là ít đổi danh tính). Bảng: `bang_quet/sweep_video_N.md`. Ba số này chỉ là chỉ báo gián tiếp, không phân biệt hộp đúng với hộp giả.
 - Cấu hình nộp của `video_2`–`video_5` được chọn **trước** khi quét. Kết quả quét cho thấy một số video còn cấu hình tốt hơn; điều đó được ghi trung thực ở cột cuối và ở mục 4, chưa thay vào bản này.
+- **Tái lập:** notebook `2A202602559-NguyenThanhHoa.ipynb` đã chạy trọn vẹn hai lần trên Kaggle (có GPU, Python 3.11 trong venv). Hai lần cho 5 file `video_N.txt` giống hệt nhau (so sánh md5), bảng quét và điểm `video_1` giống nhau, nên kết quả nộp là tất định. `video_5.txt` có track ở 746/750 frame: 4 frame không có hộp nào, nhưng cả 750 ảnh đều đã được xử lý.
 
 ## 1. Cấu hình đã chọn
 
@@ -40,6 +41,8 @@ video_1                            5016      18581     56        62
 ```
 
 Tóm tắt: **HOTA 29,52 · MOTA 21,01 · IDF1 30,30**. `video_2` đến `video_5` không có nhãn trong gói lab, nên không điền số cho các video đó.
+
+Lưu ý cách chấm: gói dữ liệu không kèm `eval_config.json`, nên `video_1` được chấm bằng cấu hình benchmark mặc định của TrackEval cho định dạng MOTChallenge (nhánh `train`, lớp người đi bộ, bỏ vùng bị đánh dấu bỏ qua trong nhãn). Cách chấm này có thể khác một chút so với số của giảng viên, nhưng so sánh giữa các cấu hình trong báo cáo dùng cùng một cách chấm nên vẫn nhất quán.
 
 ## 3. Phân tích
 
