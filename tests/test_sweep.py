@@ -3,7 +3,19 @@
 import pytest
 
 from run_all import SUBMISSION_CONFIG, merge_config
-from sweep import format_table, grid, parse_summary, pick_best, track_stats
+from sweep import (
+    PROXY_INTERCEPT,
+    PROXY_W_COVER,
+    PROXY_W_GAPS,
+    format_table,
+    grid,
+    merge_best_config,
+    parse_summary,
+    pearson,
+    pick_best,
+    proxy_scores,
+    track_stats,
+)
 
 SUMMARY = "HOTA DetA MOTA IDF1 IDSW\n29.46 18.1 19.81 29.35 25\n"
 
@@ -30,7 +42,53 @@ def test_track_stats_counts_rows_ids_and_length() -> None:
 
 
 def test_track_stats_empty() -> None:
-    assert track_stats([], 10) == {"rows": 0, "ids": 0, "boxes_per_frame": 0.0, "mean_track_len": 0.0}
+    assert track_stats([], 10) == {
+        "rows": 0, "ids": 0, "boxes_per_frame": 0.0, "mean_track_len": 0.0, "gaps": 0,
+    }
+
+
+def test_track_stats_counts_gaps_within_one_id() -> None:
+    # ID 1 xuất hiện ở frame 1, 2, 5, 6 -> một chỗ đứt quãng; ID 2 liên tục -> không đứt.
+    lines = [f"{f},1,0,0,10,10,0.9,-1,-1,-1" for f in (1, 2, 5, 6)]
+    lines += [f"{f},2,0,0,10,10,0.9,-1,-1,-1" for f in (1, 2, 3)]
+    assert track_stats(lines, n_frames=10)["gaps"] == 1
+
+
+def test_track_stats_ignores_frames_beyond_limit() -> None:
+    lines = ["1,1,0,0,10,10,0.9,-1,-1,-1", "200,1,0,0,10,10,0.9,-1,-1,-1"]
+    stats = track_stats(lines, n_frames=150)
+    assert stats["rows"] == 1 and stats["gaps"] == 0
+
+
+def test_proxy_scores_rewards_coverage_and_penalises_gaps() -> None:
+    rows = [
+        {"boxes_per_frame": 10.0, "gaps": 0},
+        {"boxes_per_frame": 10.0, "gaps": 100},
+        {"boxes_per_frame": 5.0, "gaps": 0},
+    ]
+    scores = proxy_scores(rows)
+    assert scores[0] == pytest.approx(PROXY_INTERCEPT + PROXY_W_COVER)
+    assert scores[1] == pytest.approx(PROXY_INTERCEPT + PROXY_W_COVER + PROXY_W_GAPS)
+    assert scores[0] > scores[2] > scores[1]
+    assert proxy_scores([]) == []
+
+
+def test_proxy_scores_handles_all_zero() -> None:
+    assert proxy_scores([{"boxes_per_frame": 0.0, "gaps": 0}]) == [pytest.approx(PROXY_INTERCEPT)]
+
+
+def test_pearson_known_values() -> None:
+    assert pearson([1, 2, 3], [2, 4, 6]) == pytest.approx(1.0)
+    assert pearson([1, 2, 3], [6, 4, 2]) == pytest.approx(-1.0)
+    assert pearson([1, 1, 1], [1, 2, 3]) == 0.0
+    assert pearson([1], [1]) == 0.0
+    with pytest.raises(ValueError):
+        pearson([1, 2], [1])
+
+
+def test_merge_best_config_keeps_other_videos() -> None:
+    merged = merge_best_config({"video_1": ["botsort", 0.1, 0.5]}, "video_2", {"tracker": "ocsort", "conf": 0.2, "iou": 0.4})
+    assert merged == {"video_1": ["botsort", 0.1, 0.5], "video_2": ["ocsort", 0.2, 0.4]}
 
 
 def test_grid_size() -> None:

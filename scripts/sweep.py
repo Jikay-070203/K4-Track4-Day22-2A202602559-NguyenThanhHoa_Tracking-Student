@@ -2,11 +2,15 @@
 """Quét tracker / conf / iou để chọn cấu hình nộp.
 
 Hai chế độ:
-    video1: chạy đủ frame, chấm HOTA / MOTA / IDF1 bằng TrackEval (video_1 có nhãn),
-            rồi quét thêm ``iou`` quanh tracker tốt nhất. Ghi ``best_config.json``.
-    others: video_2..video_5 không có nhãn; chạy giới hạn frame và in số liệu thống kê
-            (hộp/frame, số ID, độ dài track trung bình) để đối chiếu với video xem thử.
+    video1: chạy đủ frame, chấm HOTA / MOTA / IDF1 bằng TrackEval (video_1 có nhãn).
+            Ba giai đoạn, mỗi lần chỉ đổi một tham số: tracker x conf -> conf mịn hơn
+            (0.15, 0.5) cho tracker tốt nhất -> iou (0.4, 0.7) cho cấu hình tốt nhất.
+    others: video_2..video_5 không có nhãn nên không chấm HOTA được. Dùng điểm thay thế
+            ``proxy`` tính từ file kết quả (độ phủ hộp/frame và số chỗ track bị đứt quãng),
+            với hệ số đã khớp trên 17 cấu hình của video_1 (xem ``PROXY_*``). Cũng ba giai đoạn
+            như trên, rồi ghi cấu hình có ``proxy`` cao nhất.
 
+``best_config.json`` được ghi/gộp theo từng video để ``run_all.py --config-json`` đọc.
 Detector, kích thước ảnh và Re-ID vẫn cố định; chỉ đổi ``--tracker``, ``--conf``, ``--iou``.
 
 Ví dụ:
@@ -20,19 +24,33 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TRACKERS = ["bytetrack", "ocsort", "botsort", "strongsort", "deepocsort"]
 CONFS_VIDEO1 = [0.1, 0.2, 0.3]
 CONFS_OTHERS = [0.15, 0.3]
+CONFS_REFINE_VIDEO1 = [0.15, 0.5]
+CONFS_REFINE_OTHERS = [0.1, 0.2, 0.5]
 IOUS_REFINE = [0.4, 0.7]
 OTHER_VIDEOS = ["video_2", "video_3", "video_4", "video_5"]
 SCORE_KEYS = ["HOTA", "DetA", "AssA", "MOTA", "IDF1", "IDSW"]
+PROXY_FRAMES = 150
+
+# Điểm thay thế cho video không nhãn: HOTA ước lượng = a + b * phủ_chuẩn_hoá + c * đứt_chuẩn_hoá.
+# Hệ số khớp bằng bình phương tối thiểu trên 17 cấu hình của video_1 (150 frame đầu), trong đó
+# phủ_chuẩn_hoá = hộp/frame chia cho giá trị lớn nhất cùng video, đứt_chuẩn_hoá = số chỗ track
+# đứt quãng chia cho giá trị lớn nhất cùng video. Kiểm tra leave-one-out: tương quan 0,82 với HOTA
+# thật, cấu hình được chọn đứng hạng 5/17 (HOTA kém cấu hình tốt nhất 0,8). Chỉ kiểm chứng trên một
+# video có nhãn, nên chỉ dùng để xếp hạng, không xem là số HOTA.
+PROXY_INTERCEPT = 24.53
+PROXY_W_COVER = 13.35
+PROXY_W_GAPS = -14.39
 
 
 def parse_summary(text: str) -> Dict[str, float]:
@@ -59,28 +77,87 @@ def parse_summary(text: str) -> Dict[str, float]:
 def track_stats(lines: Sequence[str], n_frames: int) -> Dict[str, float]:
     """Thống kê nhanh một file kết quả MOT, không cần nhãn.
 
+    Chỉ tính các dòng có ``frame <= n_frames``.
+
     Args:
         lines: Các dòng ``frame,id,x,y,w,h,conf,...``.
-        n_frames: Số frame đã chạy.
+        n_frames: Số frame cần tính (và dùng làm mẫu số của hộp/frame).
 
     Returns:
-        Dict gồm ``rows``, ``ids``, ``boxes_per_frame`` và ``mean_track_len``
-        (số hộp trung bình trên mỗi ID; càng ngắn càng dễ bị đứt ID).
+        Dict gồm ``rows``, ``ids``, ``boxes_per_frame``, ``mean_track_len`` (số hộp trung bình
+        trên mỗi ID) và ``gaps`` (số lần một ID bị đứt quãng: có frame trống ở giữa hai lần
+        xuất hiện; đây là dấu hiệu mất rồi bắt lại hoặc đổi danh tính).
     """
-    ids = set()
+    frames_by_id: Dict[int, List[int]] = {}
     rows = 0
     for line in lines:
         if not line.strip():
             continue
         parts = line.split(",")
-        ids.add(int(float(parts[1])))
+        frame = int(float(parts[0]))
+        if n_frames and frame > n_frames:
+            continue
+        frames_by_id.setdefault(int(float(parts[1])), []).append(frame)
         rows += 1
+    gaps = 0
+    for frames in frames_by_id.values():
+        frames.sort()
+        gaps += sum(1 for a, b in zip(frames, frames[1:]) if b - a > 1)
+    ids = len(frames_by_id)
     return {
         "rows": rows,
-        "ids": len(ids),
+        "ids": ids,
         "boxes_per_frame": rows / n_frames if n_frames else 0.0,
-        "mean_track_len": rows / len(ids) if ids else 0.0,
+        "mean_track_len": rows / ids if ids else 0.0,
+        "gaps": gaps,
     }
+
+
+def proxy_scores(rows: Sequence[Dict[str, object]]) -> List[float]:
+    """Tính điểm thay thế cho từng cấu hình của MỘT video (chuẩn hoá theo cấu hình tối đa).
+
+    Args:
+        rows: Mỗi hàng có ``boxes_per_frame`` và ``gaps``.
+
+    Returns:
+        Điểm HOTA ước lượng, cùng thứ tự với ``rows``. Giá trị chỉ dùng để xếp hạng.
+    """
+    if not rows:
+        return []
+    max_cover = max(float(r["boxes_per_frame"]) for r in rows) or 1.0
+    max_gaps = max(float(r["gaps"]) for r in rows) or 1.0
+    return [
+        PROXY_INTERCEPT
+        + PROXY_W_COVER * float(r["boxes_per_frame"]) / max_cover
+        + PROXY_W_GAPS * float(r["gaps"]) / max_gaps
+        for r in rows
+    ]
+
+
+def pearson(xs: Sequence[float], ys: Sequence[float]) -> float:
+    """Hệ số tương quan Pearson.
+
+    Args:
+        xs: Dãy thứ nhất.
+        ys: Dãy thứ hai, cùng độ dài.
+
+    Returns:
+        Hệ số trong [-1, 1]; ``0.0`` khi một dãy không đổi hoặc ít hơn hai phần tử.
+
+    Raises:
+        ValueError: Khi hai dãy khác độ dài.
+    """
+    if len(xs) != len(ys):
+        raise ValueError("Hai dãy phải cùng độ dài.")
+    n = len(xs)
+    if n < 2:
+        return 0.0
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx == 0 or syy == 0:
+        return 0.0
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / math.sqrt(sxx * syy)
 
 
 def grid(trackers: Sequence[str], confs: Sequence[float], iou: float) -> List[Tuple[str, float, float]]:
@@ -132,6 +209,22 @@ def pick_best(rows: Sequence[Dict[str, object]], key: str = "HOTA") -> Dict[str,
     if not rows:
         raise ValueError("Không có kết quả nào để chọn.")
     return max(rows, key=lambda r: float(r[key]))
+
+
+def merge_best_config(existing: Dict[str, list], video: str, row: Dict[str, object]) -> Dict[str, list]:
+    """Gộp cấu hình tốt nhất của một video vào dict ``best_config``.
+
+    Args:
+        existing: Nội dung ``best_config.json`` hiện có (có thể rỗng).
+        video: Tên video.
+        row: Hàng kết quả có ``tracker``, ``conf``, ``iou``.
+
+    Returns:
+        Dict mới; các video khác giữ nguyên.
+    """
+    merged = dict(existing)
+    merged[video] = [row["tracker"], row["conf"], row["iou"]]
+    return merged
 
 
 def run_tracker(lab_data: Path, video: str, tracker: str, conf: float, iou: float,
@@ -212,13 +305,45 @@ def write_outputs(rows: Sequence[Dict[str, object]], columns: Sequence[str], out
     (out_dir / f"{stem}.md").write_text(format_table(rows, columns) + "\n", encoding="utf-8")
 
 
+def update_best_config(ketqua: Path, video: str, row: Dict[str, object]) -> None:
+    """Ghi cấu hình tốt nhất của ``video`` vào ``best_config.json`` (gộp với nội dung cũ).
+
+    Args:
+        ketqua: Thư mục kết quả.
+        video: Tên video.
+        row: Hàng kết quả tốt nhất.
+    """
+    path = ketqua / "best_config.json"
+    existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    path.write_text(json.dumps(merge_best_config(existing, video, row)), encoding="utf-8")
+
+
+def run_stage(configs: Sequence[Tuple[str, float, float]], seen: set, rows: List[Dict[str, object]],
+              evaluate) -> None:
+    """Chạy các cấu hình chưa thử trong ``configs`` bằng hàm ``evaluate``.
+
+    Args:
+        configs: Danh sách ``(tracker, conf, iou)``.
+        seen: Tập cấu hình đã chạy; được cập nhật tại chỗ.
+        rows: Danh sách kết quả; ``evaluate`` thêm hàng mới vào đây.
+        evaluate: Hàm nhận ``(tracker, conf, iou)`` và thêm một hàng vào ``rows`` khi thành công.
+    """
+    for config in configs:
+        key = (config[0], round(config[1], 3), round(config[2], 3))
+        if key in seen:
+            continue
+        seen.add(key)
+        evaluate(*config)
+
+
 def sweep_video1(args: argparse.Namespace) -> None:
-    """Quét tracker x conf, rồi quét iou quanh tracker tốt nhất, chấm bằng HOTA.
+    """Quét ba giai đoạn cho video_1 và chấm HOTA bằng TrackEval.
 
     Args:
         args: Tham số dòng lệnh đã parse.
     """
     rows: List[Dict[str, object]] = []
+    seen: set = set()
 
     def evaluate(tracker: str, conf: float, iou: float) -> None:
         name = f"{tracker}_c{conf:.2f}_i{iou:g}"
@@ -230,37 +355,44 @@ def sweep_video1(args: argparse.Namespace) -> None:
         except RuntimeError as err:
             print(f"  BỎ QUA: {err}", flush=True)
             return
-        row = {"tracker": tracker, "conf": conf, "iou": iou, **{k: score.get(k, 0.0) for k in SCORE_KEYS}}
+        stats = track_stats(txt.read_text().splitlines(), PROXY_FRAMES)
+        row = {"tracker": tracker, "conf": conf, "iou": iou, **{k: score.get(k, 0.0) for k in SCORE_KEYS},
+               "bpf": stats["boxes_per_frame"], "gaps": stats["gaps"]}
         rows.append(row)
         print("  " + ", ".join(f"{k}={row[k]:.2f}" for k in SCORE_KEYS), flush=True)
 
-    for tracker, conf, iou in grid(TRACKERS, CONFS_VIDEO1, 0.5):
-        evaluate(tracker, conf, iou)
+    run_stage(grid(args.trackers, CONFS_VIDEO1, 0.5), seen, rows, evaluate)
     if not rows:
         raise SystemExit("Không cấu hình nào chấm được.")
     best = pick_best(rows)
-    for iou in IOUS_REFINE:
-        evaluate(str(best["tracker"]), float(best["conf"]), iou)
+    run_stage(grid([str(best["tracker"])], CONFS_REFINE_VIDEO1, 0.5), seen, rows, evaluate)
+    best = pick_best(rows)
+    run_stage([(str(best["tracker"]), float(best["conf"]), iou) for iou in IOUS_REFINE], seen, rows, evaluate)
 
+    for row, score in zip(rows, proxy_scores([{"boxes_per_frame": r["bpf"], "gaps": r["gaps"]} for r in rows])):
+        row["proxy"] = score
+    corr = pearson([float(r["proxy"]) for r in rows], [float(r["HOTA"]) for r in rows])
     rows.sort(key=lambda r: -float(r["HOTA"]))
-    columns = ["tracker", "conf", "iou"] + SCORE_KEYS
+    columns = ["tracker", "conf", "iou"] + SCORE_KEYS + ["bpf", "gaps", "proxy"]
     write_outputs(rows, columns, args.ketqua, "sweep_video_1")
     best = pick_best(rows)
-    (args.ketqua / "best_config.json").write_text(
-        json.dumps({"video_1": [best["tracker"], best["conf"], best["iou"]]}), encoding="utf-8")
+    update_best_config(args.ketqua, "video_1", best)
     print("\n" + format_table(rows, columns))
-    print(f"\nTốt nhất theo HOTA: {best['tracker']} conf={best['conf']} iou={best['iou']}")
+    print(f"\nTương quan điểm thay thế (proxy) với HOTA thật trên {len(rows)} cấu hình: {corr:+.2f}")
+    print(f"Tốt nhất theo HOTA: {best['tracker']} conf={best['conf']} iou={best['iou']}")
 
 
 def sweep_others(args: argparse.Namespace) -> None:
-    """Chạy giới hạn frame cho video_2..5 và thống kê, không cần nhãn.
+    """Quét ba giai đoạn cho video_2..5 và xếp hạng bằng điểm thay thế ``proxy``.
 
     Args:
         args: Tham số dòng lệnh đã parse.
     """
     for video in args.videos:
         rows: List[Dict[str, object]] = []
-        for tracker, conf, iou in grid(TRACKERS, CONFS_OTHERS, 0.5):
+        seen: set = set()
+
+        def evaluate(tracker: str, conf: float, iou: float, video: str = video) -> None:
             name = f"{tracker}_c{conf:.2f}_i{iou:g}"
             print(f"[{video}] {name} ...", flush=True)
             try:
@@ -268,16 +400,38 @@ def sweep_others(args: argparse.Namespace) -> None:
                                   args.work / "thu_nghiem" / video / name, args.device, args.max_frames)
             except RuntimeError as err:
                 print(f"  BỎ QUA: {err}", flush=True)
-                continue
+                return
             stats = track_stats(txt.read_text().splitlines(), args.max_frames)
             rows.append({"tracker": tracker, "conf": conf, "iou": iou, **stats})
-        columns = ["tracker", "conf", "iou", "rows", "ids", "boxes_per_frame", "mean_track_len"]
+
+        def rank() -> Dict[str, object]:
+            for row, score in zip(rows, proxy_scores(rows)):
+                row["proxy"] = score
+            return pick_best(rows, "proxy")
+
+        run_stage(grid(args.trackers, CONFS_OTHERS, 0.5), seen, rows, evaluate)
+        if not rows:
+            print(f"[{video}] không cấu hình nào chạy được, bỏ qua.")
+            continue
+        best = rank()
+        run_stage(grid([str(best["tracker"])], CONFS_REFINE_OTHERS, 0.5), seen, rows, evaluate)
+        best = rank()
+        run_stage([(str(best["tracker"]), float(best["conf"]), iou) for iou in IOUS_REFINE], seen, rows, evaluate)
+        best = rank()
+
+        rows.sort(key=lambda r: -float(r["proxy"]))
+        columns = ["tracker", "conf", "iou", "rows", "ids", "boxes_per_frame", "mean_track_len", "gaps", "proxy"]
         write_outputs(rows, columns, args.ketqua, f"sweep_{video}")
+        update_best_config(args.ketqua, video, best)
         print(f"\n### {video} ({args.max_frames} frame)\n" + format_table(rows, columns) + "\n")
+        print(f"Tốt nhất theo proxy: {best['tracker']} conf={best['conf']} iou={best['iou']}\n")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     """Khai báo tham số dòng lệnh.
+
+    Args:
+        argv: Danh sách tham số; ``None`` nghĩa là đọc từ ``sys.argv``.
 
     Returns:
         Namespace chứa các tham số đã parse.
@@ -290,9 +444,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--work", type=Path, default=Path("runs"), help="Thư mục chứa kết quả từng lần thử")
     parser.add_argument("--ketqua", type=Path, default=Path("ketqua"), help="Thư mục ghi bảng tổng hợp")
+    parser.add_argument("--trackers", nargs="+", default=TRACKERS, choices=TRACKERS)
     parser.add_argument("--videos", nargs="+", default=OTHER_VIDEOS, choices=OTHER_VIDEOS)
-    parser.add_argument("--max-frames", type=int, default=150, help="Chỉ dùng cho chế độ others")
-    return parser.parse_args()
+    parser.add_argument("--max-frames", type=int, default=PROXY_FRAMES, help="Chỉ dùng cho chế độ others")
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
