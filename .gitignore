@@ -1,7 +1,9 @@
 lab_data/
 runs/
-TrackEval/
 *.pt
-__pycache__/
 .ipynb_checkpoints/
 .pytest_cache/
+venv/
+TrackEval/
+__pycache__/
+*.pyc
