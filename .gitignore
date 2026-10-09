@@ -1,9 +1,25 @@
+# Dữ liệu và trọng số: không commit
 lab_data/
-runs/
 *.pt
-.ipynb_checkpoints/
-.pytest_cache/
+
+# Kết quả chạy: chỉ giữ 5 file nộp runs/nop_bai/video_N.txt
+runs/*
+!runs/nop_bai/
+runs/nop_bai/*
+!runs/nop_bai/video_[1-5].txt
+
+# Video xem thử, file nén, thư mục kết quả tải từ Kaggle
+*.mp4
+*.zip
+result/
+ketqua/
+lab_eval/
+lab_raw/
+
+# Môi trường, cache, TrackEval (clone riêng)
 venv/
 TrackEval/
 __pycache__/
 *.pyc
+.ipynb_checkpoints/
+.pytest_cache/

@@ -26,10 +26,12 @@ from typing import Dict, List, Sequence, Tuple
 SCRIPT_DIR = Path(__file__).resolve().parent
 VIDEOS = ["video_1", "video_2", "video_3", "video_4", "video_5"]
 
-# video -> (tracker, conf, iou). Đây là cấu hình khởi điểm suy ra từ đặc điểm cảnh;
-# hãy thay bằng cấu hình bạn thấy tốt nhất sau khi quét và xem video.
+# video -> (tracker, conf, iou): cấu hình của bản nộp lần 1 (sinh ra runs/nop_bai/).
+#   video_1: HOTA cao nhất trong 17 cấu hình quét bằng sweep.py (có nhãn).
+#   video_2..5: chọn theo đặc điểm cảnh trước khi quét; bảng quét 150 frame ở bang_quet/ cho thấy
+#   còn cấu hình tốt hơn (xem mục 4 của báo cáo), sẽ cập nhật ở bản sau.
 SUBMISSION_CONFIG: Dict[str, Tuple[str, float, float]] = {
-    "video_1": ("botsort", 0.30, 0.5),     # tĩnh, ban ngày: Re-ID giữ ID khi cắt ngang
+    "video_1": ("botsort", 0.10, 0.5),     # tĩnh, ban ngày: HOTA 29.52, tốt nhất khi quét
     "video_2": ("deepocsort", 0.20, 0.6),  # đêm, rất đông, người nhỏ: conf thấp, Re-ID
     "video_3": ("botsort", 0.25, 0.5),     # camera di chuyển: botsort có bù chuyển động camera
     "video_4": ("botsort", 0.40, 0.5),     # trong nhà, kính phản chiếu: conf cao bớt hộp giả

@@ -1,0 +1,99 @@
+/kaggle/working/scripts/evaluate_practice.py:35: DeprecationWarning: `np.float` is a deprecated alias for the builtin `float`. To silence this warning, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  if not hasattr(np, "float"):
+/kaggle/working/scripts/evaluate_practice.py:37: DeprecationWarning: `np.int` is a deprecated alias for the builtin `int`. To silence this warning, use `int` by itself. Doing this will not modify any behavior and is safe. When replacing `np.int`, you may wish to use e.g. `np.int64` or `np.int32` to specify the precision. If you wish to review your current use, check the release note link for additional information.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  if not hasattr(np, "int"):
+Error importing BURST due to missing underlying dependency: No module named 'pycocotools'
+
+Eval Config:
+USE_PARALLEL         : False                         
+NUM_PARALLEL_CORES   : 8                             
+BREAK_ON_ERROR       : True                          
+RETURN_ON_ERROR      : False                         
+LOG_ON_ERROR         : /kaggle/working/TrackEval/error_log.txt
+PRINT_RESULTS        : True                          
+PRINT_ONLY_COMBINED  : False                         
+PRINT_CONFIG         : True                          
+TIME_PROGRESS        : True                          
+DISPLAY_LESS_PROGRESS : False                         
+OUTPUT_SUMMARY       : True                          
+OUTPUT_EMPTY_CLASSES : True                          
+OUTPUT_DETAILED      : True                          
+PLOT_CURVES          : True                          
+
+MotChallenge2DBox Config:
+PRINT_CONFIG         : True                          
+GT_FOLDER            : /kaggle/working/TrackEval/data/gt/mot_challenge
+TRACKERS_FOLDER      : /kaggle/working/TrackEval/data/trackers/mot_challenge
+OUTPUT_FOLDER        : None                          
+TRACKERS_TO_EVAL     : ['final_video1']              
+CLASSES_TO_EVAL      : ['pedestrian']                
+BENCHMARK            : MOT17                         
+SPLIT_TO_EVAL        : train                         
+INPUT_AS_ZIP         : False                         
+DO_PREPROC           : True                          
+TRACKER_SUB_FOLDER   : data                          
+OUTPUT_SUB_FOLDER    :                               
+TRACKER_DISPLAY_NAMES : None                          
+SEQMAP_FOLDER        : None                          
+SEQMAP_FILE          : None                          
+SEQ_INFO             : {'video_1': None}             
+GT_LOC_FORMAT        : {gt_folder}/{seq}/gt/gt.txt   
+SKIP_SPLIT_FOL       : False                         
+
+CLEAR Config:
+METRICS              : ['HOTA', 'CLEAR', 'Identity'] 
+THRESHOLD            : 0.5                           
+PRINT_CONFIG         : True                          
+
+Identity Config:
+METRICS              : ['HOTA', 'CLEAR', 'Identity'] 
+THRESHOLD            : 0.5                           
+PRINT_CONFIG         : True                          
+
+Evaluating 1 tracker(s) on 1 sequence(s) for 1 class(es) on MotChallenge2DBox dataset using the following metrics: HOTA, CLEAR, Identity, Count
+
+
+Evaluating final_video1
+
+    MotChallenge2DBox.get_raw_seq_data(final_video1, video_1)              0.1966 sec
+    MotChallenge2DBox.get_preprocessed_seq_data(pedestrian)                0.1615 sec
+    HOTA.eval_sequence()                                                   0.2178 sec
+    CLEAR.eval_sequence()                                                  0.0354 sec
+    Identity.eval_sequence()                                               0.0084 sec
+    Count.eval_sequence()                                                  0.0000 sec
+1 eval_sequence(video_1, final_video1)                                   0.6218 sec
+
+All sequences for final_video1 finished in 0.62 seconds
+
+HOTA: final_video1-pedestrian      HOTA      DetA      AssA      DetRe     DetPr     AssRe     AssPr     LocA      OWTA      HOTA(0)   LocA(0)   HOTALocA(0)
+video_1                            29.523    19.561    44.952    20.335    75.327    47.931    82.084    82.598    30.152    36.707    76.442    28.059    
+COMBINED                           29.523    19.561    44.952    20.335    75.327    47.931    82.084    82.598    30.152    36.707    76.442    28.059    
+
+CLEAR: final_video1-pedestrian     MOTA      MOTP      MODA      CLR_Re    CLR_Pr    MTR       PTR       MLR       sMOTA     CLR_TP    CLR_FN    CLR_FP    IDSW      MT        PT        ML        Frag      
+video_1                            21.005    80.163    21.129    24.062    89.135    12.903    20.968    66.129    16.232    4471      14110     545       23        8         13        41        64        
+COMBINED                           21.005    80.163    21.129    24.062    89.135    12.903    20.968    66.129    16.232    4471      14110     545       23        8         13        41        64        
+
+Identity: final_video1-pedestrian  IDF1      IDR       IDP       IDTP      IDFN      IDFP      
+video_1                            30.3      19.24     71.272    3575      15006     1441      
+COMBINED                           30.3      19.24     71.272    3575      15006     1441      
+
+Count: final_video1-pedestrian     Dets      GT_Dets   IDs       GT_IDs    
+video_1                            5016      18581     56        62        
+COMBINED                           5016      18581     56        62        
+
+Timing analysis:
+MotChallenge2DBox.get_raw_seq_data                                     0.1966 sec
+MotChallenge2DBox.get_preprocessed_seq_data                            0.1615 sec
+HOTA.eval_sequence                                                     0.2178 sec
+CLEAR.eval_sequence                                                    0.0354 sec
+Identity.eval_sequence                                                 0.0084 sec
+Count.eval_sequence                                                    0.0000 sec
+eval_sequence                                                          0.6218 sec
+Evaluator.evaluate                                                     1.2893 sec
+Đang chấm video luyện:
+  /kaggle/working/venv/bin/python /kaggle/working/TrackEval/scripts/run_mot_challenge.py --GT_FOLDER /kaggle/working/TrackEval/data/gt/mot_challenge --TRACKERS_FOLDER /kaggle/working/TrackEval/data/trackers/mot_challenge --BENCHMARK MOT17 --SPLIT_TO_EVAL train --SEQ_INFO video_1 --TRACKERS_TO_EVAL final_video1 --METRICS HOTA CLEAR Identity --USE_PARALLEL False
+
+
+Đọc bảng phía trên: HOTA cân bằng phát hiện và giữ danh tính; MOTA phạt số lần đổi ID; IDF1 nhạy với track dài bị gán sai ID. Dùng các số này cho video_1 trong báo cáo. Không có bảng số cho video khác.
