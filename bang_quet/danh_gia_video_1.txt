@@ -57,41 +57,41 @@ Evaluating 1 tracker(s) on 1 sequence(s) for 1 class(es) on MotChallenge2DBox da
 
 Evaluating final_video1
 
-    MotChallenge2DBox.get_raw_seq_data(final_video1, video_1)              0.1966 sec
-    MotChallenge2DBox.get_preprocessed_seq_data(pedestrian)                0.1615 sec
-    HOTA.eval_sequence()                                                   0.2178 sec
-    CLEAR.eval_sequence()                                                  0.0354 sec
-    Identity.eval_sequence()                                               0.0084 sec
+    MotChallenge2DBox.get_raw_seq_data(final_video1, video_1)              0.2021 sec
+    MotChallenge2DBox.get_preprocessed_seq_data(pedestrian)                0.1644 sec
+    HOTA.eval_sequence()                                                   0.2176 sec
+    CLEAR.eval_sequence()                                                  0.0376 sec
+    Identity.eval_sequence()                                               0.0089 sec
     Count.eval_sequence()                                                  0.0000 sec
-1 eval_sequence(video_1, final_video1)                                   0.6218 sec
+1 eval_sequence(video_1, final_video1)                                   0.6328 sec
 
-All sequences for final_video1 finished in 0.62 seconds
+All sequences for final_video1 finished in 0.63 seconds
 
 HOTA: final_video1-pedestrian      HOTA      DetA      AssA      DetRe     DetPr     AssRe     AssPr     LocA      OWTA      HOTA(0)   LocA(0)   HOTALocA(0)
-video_1                            29.523    19.561    44.952    20.335    75.327    47.931    82.084    82.598    30.152    36.707    76.442    28.059    
-COMBINED                           29.523    19.561    44.952    20.335    75.327    47.931    82.084    82.598    30.152    36.707    76.442    28.059    
+video_1                            29.543    19.601    44.923    20.663    71.338    48.083    80.394    82.169    30.386    37.116    74.913    27.804    
+COMBINED                           29.543    19.601    44.923    20.663    71.338    48.083    80.394    82.169    30.386    37.116    74.913    27.804    
 
 CLEAR: final_video1-pedestrian     MOTA      MOTP      MODA      CLR_Re    CLR_Pr    MTR       PTR       MLR       sMOTA     CLR_TP    CLR_FN    CLR_FP    IDSW      MT        PT        ML        Frag      
-video_1                            21.005    80.163    21.129    24.062    89.135    12.903    20.968    66.129    16.232    4471      14110     545       23        8         13        41        64        
-COMBINED                           21.005    80.163    21.129    24.062    89.135    12.903    20.968    66.129    16.232    4471      14110     545       23        8         13        41        64        
+video_1                            20.198    79.651    20.408    24.687    85.229    14.516    19.355    66.129    15.175    4587      13994     795       39        9         12        41        70        
+COMBINED                           20.198    79.651    20.408    24.687    85.229    14.516    19.355    66.129    15.175    4587      13994     795       39        9         12        41        70        
 
 Identity: final_video1-pedestrian  IDF1      IDR       IDP       IDTP      IDFN      IDFP      
-video_1                            30.3      19.24     71.272    3575      15006     1441      
-COMBINED                           30.3      19.24     71.272    3575      15006     1441      
+video_1                            29.921    19.294    66.611    3585      14996     1797      
+COMBINED                           29.921    19.294    66.611    3585      14996     1797      
 
 Count: final_video1-pedestrian     Dets      GT_Dets   IDs       GT_IDs    
-video_1                            5016      18581     56        62        
-COMBINED                           5016      18581     56        62        
+video_1                            5382      18581     61        62        
+COMBINED                           5382      18581     61        62        
 
 Timing analysis:
-MotChallenge2DBox.get_raw_seq_data                                     0.1966 sec
-MotChallenge2DBox.get_preprocessed_seq_data                            0.1615 sec
-HOTA.eval_sequence                                                     0.2178 sec
-CLEAR.eval_sequence                                                    0.0354 sec
-Identity.eval_sequence                                                 0.0084 sec
+MotChallenge2DBox.get_raw_seq_data                                     0.2021 sec
+MotChallenge2DBox.get_preprocessed_seq_data                            0.1644 sec
+HOTA.eval_sequence                                                     0.2176 sec
+CLEAR.eval_sequence                                                    0.0376 sec
+Identity.eval_sequence                                                 0.0089 sec
 Count.eval_sequence                                                    0.0000 sec
-eval_sequence                                                          0.6218 sec
-Evaluator.evaluate                                                     1.2893 sec
+eval_sequence                                                          0.6328 sec
+Evaluator.evaluate                                                     1.3058 sec
 Đang chấm video luyện:
   /kaggle/working/venv/bin/python /kaggle/working/TrackEval/scripts/run_mot_challenge.py --GT_FOLDER /kaggle/working/TrackEval/data/gt/mot_challenge --TRACKERS_FOLDER /kaggle/working/TrackEval/data/trackers/mot_challenge --BENCHMARK MOT17 --SPLIT_TO_EVAL train --SEQ_INFO video_1 --TRACKERS_TO_EVAL final_video1 --METRICS HOTA CLEAR Identity --USE_PARALLEL False
 

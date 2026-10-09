@@ -26,16 +26,16 @@ from typing import Dict, List, Sequence, Tuple
 SCRIPT_DIR = Path(__file__).resolve().parent
 VIDEOS = ["video_1", "video_2", "video_3", "video_4", "video_5"]
 
-# video -> (tracker, conf, iou): cấu hình dự phòng khi chưa có best_config.json từ sweep.py.
-#   video_1: HOTA cao nhất trong bảng quét (có nhãn).
-#   video_2..5: không nhãn; botsort conf 0.15 có điểm thay thế (proxy) cao nhất ở cả bốn video
-#   trong lần quét 150 frame đầu. Bản chạy đầy đủ sweep.py sẽ ghi đè bằng kết quả mịn hơn.
+# video -> (tracker, conf, iou): cấu hình của bản nộp lần 2 (best_config.json do sweep.py ghi).
+#   video_1: HOTA cao nhất trong 19 cấu hình (có nhãn). video_2..5: điểm thay thế (proxy) cao nhất.
+#   Lưu ý: iou 0.7 được chọn vì HOTA/proxy nhỉnh hơn 0.5 rất ít nhưng sinh nhiều hộp chồng nhau
+#   (xem mục 3-4 của báo cáo); bản sau nên thử iou 0.5.
 SUBMISSION_CONFIG: Dict[str, Tuple[str, float, float]] = {
-    "video_1": ("botsort", 0.10, 0.5),
-    "video_2": ("botsort", 0.15, 0.5),
-    "video_3": ("botsort", 0.15, 0.5),
-    "video_4": ("botsort", 0.15, 0.5),
-    "video_5": ("botsort", 0.15, 0.5),
+    "video_1": ("botsort", 0.10, 0.7),
+    "video_2": ("botsort", 0.10, 0.7),
+    "video_3": ("botsort", 0.10, 0.7),
+    "video_4": ("botsort", 0.10, 0.5),
+    "video_5": ("botsort", 0.10, 0.7),
 }
 
 SWEEP_TRACKERS = ["bytetrack", "botsort"]
